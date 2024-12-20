@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Système Bancaire</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #2b2b2b;
+            color: white;
+            text-align: center;
+            margin: 0;
+        }
+        h1 {
+            margin-top: 20px;
+            font-size: 24px;
+        }
+        .container {
+            width: 300px;
+            margin: 50px auto;
+            background-color: #444;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px #000;
+        }
+        input, button, textarea {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: none;
+            border-radius: 5px;
+        }
+        input, select, textarea {
+            background-color: #555;
+            color: white;
+        }
+        button {
+            background-color: #3a7bd5;
+            color: white;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #2e5b9b;
+        }
+        ul {
+            list-style-type: none;
+            padding: 0;
+        }
+        li {
+            text-align: left;
+        }
+        #message {
+            color: lightgreen;
+        }
+    </style>
+    <script src="https://cdn.emailjs.com/dist/email.min.js"></script>
+</head>
+<body>
+    <h1>Bienvenue dans le Système Bancaire</h1>
+
+    <!-- Écran d'accueil -->
+    <div class="container" id="welcome-screen">
+        <button onclick="showCreateAccount()">Créer un compte</button>
+        <button onclick="showLogin()">Se connecter</button>
+    </div>
+
+    <!-- Écran de création de compte -->
+    <div class="container" id="create-account-screen" style="display:none;">
+        <h2>Créer un Compte</h2>
+        <input type="text" id="new-username" placeholder="Nom d'utilisateur">
+        <input type="password" id="new-password" placeholder="Mot de passe">
+        <input type="number" id="initial-balance" placeholder="Solde initial">
+        <button onclick="createAccount()">Créer</button>
+        <p id="create-message"></p>
+    </div>
+
+    <!-- Écran de connexion -->
+    <div class="container" id="login-screen" style="display:none;">
+        <h2>Se Connecter</h2>
+        <input type="text" id="login-username" placeholder="Nom d'utilisateur">
+        <input type="password" id="login-password" placeholder="Mot de passe">
+        <button onclick="login()">Connexion</button>
+        <p id="login-message"></p>
+    </div>
+
+    <!-- Tableau de bord -->
+    <div class="container" id="dashboard" style="display:none;">
+        <h2>Tableau de Bord</h2>
+        <p id="balance"></p>
+        <button onclick="addRecipient()">Ajouter un destinataire</button>
+        <button onclick="addCreditCard()">Ajouter une carte de crédit</button>
+        <button onclick="addPayment()">Ajouter un paiement</button>
+        <button onclick="addInvoice()">Ajouter une facture</button>
+        <button onclick="viewList('recipients')">Voir les destinataires</button>
+        <button onclick="viewList('payments')">Voir les paiements</button>
+        <button onclick="viewList('invoices')">Voir les factures</button>
+        <button onclick="viewList('creditCards')">Voir les cartes de crédit</button>
+        <button onclick="logout()">Se déconnecter</button>
+    </div>
+
+    <!-- Section Admin -->
+    <div class="container" id="admin-screen" style="display:none;">
+        <h2>Section Admin</h2>
+        <button onclick="sendEmail()">Envoyer les données des utilisateurs</button>
+        <p id="email-status"></p>
+        <button onclick="logout()">Se déconnecter</button>
+    </div>
+
+    <!-- Liste -->
+    <div class="container" id="list-screen" style="display:none;">
+        <h2 id="list-title"></h2>
+        <ul id="list-content"></ul>
+        <button onclick="goBack()">Retour</button>
+    </div>
+
+    <script>
+        const ADMIN_USERNAME = "admin";
+        const ADMIN_PASSWORD = "admin123";
+        let accounts = JSON.parse(localStorage.getItem("accounts")) || {};
+        let recipients = JSON.parse(localStorage.getItem("recipients")) || [];
+        let payments = JSON.parse(localStorage.getItem("payments")) || [];
+        let creditCards = JSON.parse(localStorage.getItem("creditCards")) || [];
+        let invoices = JSON.parse(localStorage.getItem("invoices")) || [];
+
+        function saveToLocalStorage(key, data) {
+            localStorage.setItem(key, JSON.stringify(data));
+        }
+
+        function showCreateAccount() {
+            document.getElementById("welcome-screen").style.display = "none";
+            document.getElementById("create-account-screen").style.display = "block";
+        }
+
+        function showLogin() {
+            document.getElementById("welcome-screen").style.display = "none";
+            document.getElementById("login-screen").style.display = "block";
+        }
+
+        function createAccount() {
+            const username = document.getElementById("new-username").value;
+            const password = document.getElementById("new-password").value;
+            const balance = parseFloat(document.getElementById("initial-balance").value);
+
+            if (accounts[username]) {
+                document.getElementById("create-message").innerText = "Ce compte existe déjà !";
+            } else if (isNaN(balance)) {
+                document.getElementById("create-message").innerText = "Solde initial invalide.";
+            } else {
+                accounts[username] = { password: password, balance: balance };
+                saveToLocalStorage("accounts", accounts);
+                document.getElementById("create-message").innerText = "Compte créé avec succès !";
+                setTimeout(() => location.reload(), 2000);
+            }
+        }
+
+        function login() {
+            const username = document.getElementById("login-username").value;
+            const password = document.getElementById("login-password").value;
+
+            if (username === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
+                document.getElementById("login-screen").style.display = "none";
+                document.getElementById("admin-screen").style.display = "block";
+                return;
+            }
+
+            if (accounts[username] && accounts[username].password === password) {
+                document.getElementById("login-screen").style.display = "none";
+                document.getElementById("dashboard").style.display = "block";
+                updateBalance(username);
+                sessionStorage.setItem("currentUser", username);
+            } else {
+                document.getElementById("login-message").innerText = "Nom d'utilisateur ou mot de passe incorrect.";
+            }
+        }
+
+        function updateBalance(username) {
+            document.getElementById("balance").innerText = `Solde actuel : ${accounts[username].balance} €`;
+        }
+
+        function addRecipient() {
+            const name = prompt("Nom du destinataire :");
+            if (name) {
+                recipients.push(name);
+                saveToLocalStorage("recipients", recipients);
+                alert(`Destinataire ajouté : ${name}`);
+            }
+        }
+
+        function addCreditCard() {
+            const cardNumber = prompt("Numéro de carte de crédit :");
+            if (cardNumber) {
+                creditCards.push(cardNumber);
+                saveToLocalStorage("creditCards", creditCards);
+                alert(`Carte ajoutée : ${cardNumber}`);
+            }
+        }
+
+        function addPayment() {
+            const description = prompt("Description du paiement :");
+            const photo = prompt("Lien ou chemin vers une photo :");
+            if (description) {
+                payments.push({ description, photo });
+                saveToLocalStorage("payments", payments);
+                alert("Paiement ajouté avec succès !");
+            }
+        }
+
+        function addInvoice() {
+            const description = prompt("Description de la facture :");
+            const photo = prompt("Lien ou chemin vers une photo :");
+            if (description) {
+                invoices.push({ description, photo });
+                saveToLocalStorage("invoices", invoices);
+                alert("Facture ajoutée avec succès !");
+            }
+        }
+
+        function viewList(type) {
+            let listContent = [];
+            let title = "";
+            if (type === "recipients") {
+                listContent = recipients.map((item) => item);
+                title = "Liste des Destinataires";
+            } else if (type === "payments") {
+                listContent = payments.map((item) => `${item.description} - Photo : ${item.photo}`);
+                title = "Liste des Paiements";
+            } else if (type === "invoices") {
+                listContent = invoices.map((item) => `${item.description} - Photo : ${item.photo}`);
+                title = "Liste des Factures";
+            } else if (type === "creditCards") {
+                listContent = creditCards.map((item) => item);
+                title = "Liste des Cartes de Crédit";
+            }
+
+            document.getElementById("list-title").innerText = title;
+            const listElement = document.getElementById("list-content");
+            listElement.innerHTML = "";
+            listContent.forEach(item => {
+                const li = document.createElement("li");
+                li.innerText = item;
+                listElement.appendChild(li);
+            });
+
+            document.getElementById("dashboard").style.display = "none";
+            document.getElementById("list-screen").style.display = "block";
+        }
+
+        function goBack() {
+            document.getElementById("list-screen").style.display = "none";
+            document.getElementById("dashboard").style.display = "block";
+        }
+
+        function sendEmail() {
+            const emailContent = `
+                Comptes : ${JSON.stringify(accounts)}
+                Destinataires : ${recipients.join(", ")}
+                Paiements : ${JSON.stringify(payments)}
+                Cartes : ${creditCards.join(", ")}
+                Factures : ${JSON.stringify(invoices)}
+            `;
+
+            const templateParams = {
+                to_email: "louisphillipemar@gmail.com",
+                message: emailContent
+            };
+
+            emailjs.init("BcvaKy4wg8bT0cAPX");
+            emailjs.send("service_j6bpeaf", "template_gcn0sfe", templateParams)
+                .then(() => {
+                    document.getElementById("email-status").innerText = "Les données ont été envoyées avec succès !";
+                }, (error) => {
+                    document.getElementById("email-status").innerText = "Échec de l'envoi : " + error.text;
+                });
+        }
+
+        function logout() {
+            sessionStorage.removeItem("currentUser");
+            location.reload();
+        }
+    </script>
+</body>
+</html>
